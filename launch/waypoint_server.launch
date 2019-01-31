@@ -1,0 +1,4 @@
+<launch>
+  <node type="pub_current_location.py" name="pub_current_location" pkg="waypoint_server"/>
+  <node type="waypoint_server.py" name="waypoint_server" pkg="waypoint_server" output="screen"/>
+</launch>
