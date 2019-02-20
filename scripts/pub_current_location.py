@@ -5,8 +5,8 @@ from nav_msgs.msg import Odometry
 
 
 def talker():
-    pub = rospy.Publisher('/vectornav/GPS', NavSatFix, queue_size = 10)
-    pub_odom = rospy.Publisher('/odom', Odometry, queue_size = 10)
+    pub = rospy.Publisher('/vectornav/GPS', NavSatFix, queue_size=10)
+    pub_odom = rospy.Publisher('/odom', Odometry, queue_size=10)
     rospy.init_node('talker', anonymous=True)
     rate = rospy.Rate(10)  # 10hz
     ctr = 0
@@ -38,4 +38,3 @@ if __name__ == '__main__':
         talker()
     except rospy.ROSInterruptException:
         pass
-

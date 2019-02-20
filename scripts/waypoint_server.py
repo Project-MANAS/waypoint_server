@@ -61,12 +61,16 @@ class WaypointServer(object):
         self.dist_from_origin = 0.0
         self.disp_to_wp = 0.0
 
+        self.threshold_distance = rospy.get_param(
+            "/waypoint_server/threshold_distance")
+
         self.debug = True
         # self.reset_all = True
 
         self.wp_update_state = False
         self.new_waypoint = False
-        self.generate_wp = True
+        self.generate_wp = rospy.get_param(
+            "/waypoint_server/generate_waypoints")
         self.gps_fix = False
 
         self.gps_validity_timeout = 10.0
@@ -170,8 +174,9 @@ class WaypointServer(object):
 
         wp_x = self.origin_pos_x + (self.dist_from_origin * cos(bearing_to_wp))
         wp_y = self.origin_pos_x + (self.dist_from_origin * cos(bearing_to_wp))
-        self.disp_to_wp = sqrt(pow((wp_x - self.curr_pos_x), 2) + pow(
-            (wp_y - self.curr_pos_y), 2))
+        self.disp_to_wp = sqrt(
+            pow((wp_x - self.curr_pos_x), 2) +
+            pow((wp_y - self.curr_pos_y), 2))
 
         if self.wp_update_state:
             dist_msg = Float32()
@@ -184,7 +189,7 @@ class WaypointServer(object):
             # self.dist_from_origin = haversine_distance(
             #     self.lat_origin, self.lon_origin, self.lat_wp, self.lon_wp)
             # print(self.lat_origin,self.lon_origin,self.lat_wp,self.lon_wp,self.dist_from_origin,self.disp_to_wp)
-            if self.disp_to_wp <= 10:
+            if self.disp_to_wp <= self.threshold_distance or not self.wp_update_state:
                 with open(file) as f:
                     coordinates = json.load(f)
                 self.wp_update_state = True

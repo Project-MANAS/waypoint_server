@@ -1,4 +1,7 @@
 <launch>
   <node type="pub_current_location.py" name="pub_current_location" pkg="waypoint_server"/>
-  <node type="waypoint_server.py" name="waypoint_server" pkg="waypoint_server" output="screen"/>
+  <node type="waypoint_server.py" name="waypoint_server" pkg="waypoint_server" output="screen">
+    <param name="threshold_distance" value="10"/>
+    <param name="generate_waypoints" value="True"/>
+  </node>
 </launch>
