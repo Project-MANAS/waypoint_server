@@ -12,7 +12,7 @@ import json
 import os
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import PoseStamped
-from gmaps_waypoint import GMapsWaypoint
+#from gmaps_waypoint import GMapsWaypoint
 
 EARTHRADIUS = 6371000.0
 
@@ -34,8 +34,10 @@ def bearing(lat_origin, lon_origin, lat_wp, lon_wp):
     d_lon = lon_wp - lon_origin
     return atan2(
         sin(d_lon) * cos(lat_wp),
-        cos(lat_origin) * (sin(lat_wp) - sin(lat_origin)) * cos(lat_wp) *
+        (
+        (cos(lat_origin) * sin(lat_wp)) - (sin(lat_origin) * cos(lat_wp) *
         cos(d_lon))
+        )) * 180/pi;
 
 
 class WaypointServer(object):
@@ -85,7 +87,7 @@ class WaypointServer(object):
 
     def run_server(self):
         rate = rospy.Rate(0.5)
-        rospy.Subscriber("/vectornav/GPS", NavSatFix, self.gps_subscriber)
+        rospy.Subscriber("/gps", NavSatFix, self.gps_subscriber)
         rospy.Subscriber("/odom", Odometry, self.robot_pose_subscriber)
         while not rospy.is_shutdown():
             rate.sleep()
@@ -111,7 +113,7 @@ class WaypointServer(object):
 
     def pose_publisher(self):
         desired_pose = PoseStamped()
-        desired_pose.header.frame_id = "world"
+        desired_pose.header.frame_id = "map"
         desired_pose.header.stamp = rospy.Time.now()
 
         if self.debug:
@@ -173,7 +175,7 @@ class WaypointServer(object):
                                 self.lon_wp)
 
         wp_x = self.origin_pos_x + (self.dist_from_origin * cos(bearing_to_wp))
-        wp_y = self.origin_pos_x + (self.dist_from_origin * cos(bearing_to_wp))
+        wp_y = self.origin_pos_y + (self.dist_from_origin * sin(bearing_to_wp))
         self.disp_to_wp = sqrt(
             pow((wp_x - self.curr_pos_x), 2) +
             pow((wp_y - self.curr_pos_y), 2))
