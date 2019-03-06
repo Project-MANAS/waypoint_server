@@ -13,7 +13,7 @@ import json
 import os
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import PoseStamped
-#from gmaps_waypoint import GMapsWaypoint
+from gmaps_waypoint import GMapsWaypoint
 
 EARTHRADIUS = 6371000.0
 
@@ -35,10 +35,8 @@ def bearing(lat_origin, lon_origin, lat_wp, lon_wp):
     d_lon = lon_wp - lon_origin
     return atan2(
         sin(d_lon) * cos(lat_wp),
-        (
-        (cos(lat_origin) * sin(lat_wp)) - (sin(lat_origin) * cos(lat_wp) *
-        cos(d_lon))
-        )) * 180/pi;
+        ((cos(lat_origin) * sin(lat_wp)) -
+         (sin(lat_origin) * cos(lat_wp) * cos(d_lon)))) * 180 / pi
 
 
 class WaypointServer(object):
@@ -79,10 +77,8 @@ class WaypointServer(object):
         self.gps_validity_timeout = 10.0
         self.last_valid_fix_time = rospy.get_rostime()
 
-        self.gps_topic = rospy.get_param(
-            "/waypoint_server/gps_topic")
-        self.odom_topic = rospy.get_param(
-            "/waypoint_server/odom_topic")
+        self.gps_topic = rospy.get_param("/waypoint_server/gps_topic")
+        self.odom_topic = rospy.get_param("/waypoint_server/odom_topic")
 
         self.nav_goal_pub = rospy.Publisher(
             'move_base_simple/goal', PoseStamped, queue_size=10)
@@ -110,7 +106,7 @@ class WaypointServer(object):
                 self.pose_publisher()
                 self.new_waypoint = False
 
-        elif self.wp_num==self.num_of_waypoints and self.disp_to_wp <= 2:
+        elif self.wp_num == self.num_of_waypoints and self.disp_to_wp <= 2:
             rospy.loginfo("All waypoint covered successfully!")
             rospy.loginfo("Robot has reached the destination.")
 
@@ -143,12 +139,14 @@ class WaypointServer(object):
             desired_pose.pose.position.x, desired_pose.pose.position.y,
             desired_pose.pose.position.z)
 
-        rospy.loginfo("Robot is heading %f metres at a bearing of %f degrees",
-                      sqrt(pow(desired_pose.pose.position.x,2)
-                      + pow(desired_pose.pose.position.y,2)),
-                      (bearing_to_wp * 180 / pi + 360) % 360)
+        rospy.loginfo(
+            "Robot is heading %f metres at a bearing of %f degrees",
+            sqrt(
+                pow(desired_pose.pose.position.x, 2) +
+                pow(desired_pose.pose.position.y, 2)),
+            (bearing_to_wp * 180 / pi + 360) % 360)
 
-    def marker_publisher(self,desired_pose):
+    def marker_publisher(self, desired_pose):
         wp_marker = Marker()
         wp_marker.header.frame_id = "map"
         wp_marker.header.stamp = rospy.Time.now()
