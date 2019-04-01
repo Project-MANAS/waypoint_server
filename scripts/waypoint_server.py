@@ -14,29 +14,26 @@ import os
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import PoseStamped
 from gmaps_waypoint import GMapsWaypoint
+from geopy import distance
 
 EARTHRADIUS = 6371000.0
 
 
 def haversine_distance(lat_origin, lon_origin, lat_wp, lon_wp):
-    lat_wp, lon_wp, lat_origin, lon_origin = map(
-        radians, [lat_wp, lon_wp, lat_origin, lon_origin])
-
-    a_len = pow(sin(
-        (lat_wp - lat_origin) / 2), 2) + cos(lat_origin) * cos(lat_wp) * pow(
-            sin((lon_wp - lon_origin) / 2), 2)
-
-    return EARTHRADIUS * 2.0 * atan2(sqrt(a_len), sqrt(1 - a_len))
+    origin = (lat_origin, lon_origin)
+    wp = (lat_wp, lon_wp)
+    return distance.distance(origin, wp).m
 
 
 def bearing(lat_origin, lon_origin, lat_wp, lon_wp):
     lat_wp, lon_wp, lat_origin, lon_origin = map(
         radians, [lat_wp, lon_wp, lat_origin, lon_origin])
     d_lon = lon_wp - lon_origin
+
     return atan2(
         sin(d_lon) * cos(lat_wp),
         ((cos(lat_origin) * sin(lat_wp)) -
-         (sin(lat_origin) * cos(lat_wp) * cos(d_lon)))) * 180 / pi
+         (sin(lat_origin) * cos(lat_wp) * cos(d_lon))))
 
 
 class WaypointServer(object):
@@ -123,8 +120,8 @@ class WaypointServer(object):
 
         desired_pose.pose.position.x = self.origin_pos_x + (
             self.dist_from_origin * cos(bearing_to_wp))
-        desired_pose.pose.position.y = self.origin_pos_y + (
-            self.dist_from_origin * sin(bearing_to_wp))
+        desired_pose.pose.position.y = (self.origin_pos_y + (
+            self.dist_from_origin * sin(bearing_to_wp))) * -1
         desired_pose.pose.position.z = self.alt_wp - self.origin_pos_z
         desired_pose.pose.orientation.x = 0
         desired_pose.pose.orientation.y = 0
@@ -142,8 +139,8 @@ class WaypointServer(object):
         rospy.loginfo(
             "Robot is heading %f metres at a bearing of %f degrees",
             sqrt(
-                pow(desired_pose.pose.position.x, 2) +
-                pow(desired_pose.pose.position.y, 2)),
+                pow(desired_pose.pose.position.x - self.curr_pos_x, 2) +
+                pow(desired_pose.pose.position.y - self.curr_pos_y, 2)),
             (bearing_to_wp * 180 / pi + 360) % 360)
 
     def marker_publisher(self, desired_pose):
@@ -199,7 +196,8 @@ class WaypointServer(object):
                                 self.lon_wp)
 
         wp_x = self.origin_pos_x + (self.dist_from_origin * cos(bearing_to_wp))
-        wp_y = self.origin_pos_y + (self.dist_from_origin * sin(bearing_to_wp))
+        wp_y = (self.origin_pos_y +
+                (self.dist_from_origin * sin(bearing_to_wp))) * -1
         self.disp_to_wp = sqrt(
             pow((wp_x - self.curr_pos_x), 2) +
             pow((wp_y - self.curr_pos_y), 2))
