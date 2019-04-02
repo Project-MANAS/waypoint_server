@@ -8,9 +8,25 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  message_generation
 )
 
-catkin_package()
+add_service_files(
+  FILES
+  PoseWaypoint.srv
+  GeoWaypoint.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+)
+
+catkin_package(
+  CATKIN_DEPENDS message_runtime
+)
 
 include_directories(
  ${catkin_INCLUDE_DIRS}

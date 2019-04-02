@@ -13,6 +13,7 @@ import json
 import os
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import PoseStamped
+from waypoint_server.srv import *
 from gmaps_waypoint import GMapsWaypoint
 from geopy import distance
 
@@ -90,6 +91,8 @@ class WaypointServer(object):
         rate = rospy.Rate(0.5)
         rospy.Subscriber(self.gps_topic, NavSatFix, self.gps_subscriber)
         rospy.Subscriber(self.odom_topic, Odometry, self.robot_pose_subscriber)
+        rospy.Service('pose_waypoint', PoseWaypoint, self.set_pose_waypoint)
+        rospy.Service('geo_waypoint', GeoWaypoint, self.set_geo_waypoint)
         while not rospy.is_shutdown():
             rate.sleep()
             if self.gps_fix:
@@ -227,6 +230,39 @@ class WaypointServer(object):
             f.close()
         else:
             rospy.loginfo("Waypoints are not generated")
+
+    def set_pose_waypoint(self, pose_waypoint):
+        rospy.loginfo(
+            "Pose Waypoint received. Bot heading to location X:%f Y:%f",
+            pose_waypoint.waypoint.pose.position.x,
+            pose_waypoint.waypoint.pose.position.y)
+
+        desired_pose = pose_waypoint.waypoint
+        desired_pose.header.frame_id = "map"
+        desired_pose.header.stamp = rospy.Time.now()
+
+        self.nav_goal_pub.publish(desired_pose)
+        self.marker_publisher(desired_pose)
+
+        return PoseWaypointResponse(1)
+
+    def set_geo_waypoint(self, geo_waypoint):
+        if self.gps_fix:
+            self.lat_wp = geo_waypoint.waypoint.latitude
+            self.lon_wp = geo_waypoint.waypoint.longitude
+            self.alt_wp = geo_waypoint.waypoint.altitude
+
+            rospy.loginfo(
+                "Geo Waypoint received. Bot heading to location latitude:%f longitude:%f altitude:%f",
+                geo_waypoint.waypoint.latitude,
+                geo_waypoint.waypoint.longitude,
+                geo_waypoint.waypoint.altitude)
+            self.dist_from_origin = haversine_distance(
+                self.lat_origin, self.lon_origin, self.lat_wp, self.lon_wp)
+            self.pose_publisher()
+            return GeoWaypointResponse(1)
+        else:
+            return GeoWaypointResponse(0)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 <launch>
-  <node type="waypoint_server.py" name="waypoint_server" pkg="waypoint_server" output="screen">
+  <node type="waypoint_server_node.py" name="waypoint_server" pkg="waypoint_server" output="screen">
     <param name="threshold_distance" value="5"/>
     <param name="generate_waypoints" value="False"/>
     <param name="gps_topic" value="/gps"/>

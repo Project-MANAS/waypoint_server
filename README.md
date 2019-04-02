@@ -27,6 +27,14 @@ pip install geopy
 roslaunch waypoint_server waypoint_server.launch
 ```
 
+The waypoint server also implements service calls.  
+- Pose Waypoint  
+    Service call on the topic `pose_waypoint` sets pose waypoint with respect to the map frame. This accepts waypoint as a `PoseStamped` message type.  
+- Geo Waypoint  
+Service call on the topic `geo_waypoint` sets geo waypoint with respect to the map frame. This accepts waypoint as a `NavSatFix` message type.
+
+The service calls return `1` is the waypoint was successfully published. Refer the srv files for more info. 
+
 #### Google Maps integration
 Create a Google Maps Developer account and generate an **API Key** with **Maps** and **Places** options selected.  
 Inside the repository type the following:  
