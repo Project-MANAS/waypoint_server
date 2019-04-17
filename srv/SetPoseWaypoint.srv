@@ -1,0 +1,8 @@
+geometry_msgs/PoseStamped waypoint
+int64 mode
+# 0 = Append waypoint to list
+# 1 = Add waypoint to front of list
+# 2 = Clear list and add waypoint
+# 3 = Clear list
+---
+int64 status

@@ -33,11 +33,9 @@ class GMapsWaypoint(object):
         gmaps = googlemaps.Client(key=self.get_api_key())
 
         now = datetime.now()
-        directions = gmaps.directions(origin, dest, mode="driving",\
-          departure_time=now)[0]
+        directions = gmaps.directions(origin, dest, mode="driving", departure_time=now)[0]
 
-        coordinates = self.decode_polyline(\
-          directions['overview_polyline']['points'])
+        coordinates = self.decode_polyline(directions['overview_polyline']['points'])
 
         file_name = self.pkg + "/waypoint_viewer/coordinates.json"
         with open(file_name, 'wb') as outfile:

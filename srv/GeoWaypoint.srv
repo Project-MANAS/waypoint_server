@@ -1,3 +1,0 @@
-sensor_msgs/NavSatFix waypoint
----
-int64 status
