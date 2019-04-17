@@ -42,12 +42,12 @@ class GeoWaypoint(object):
 
 
 class PoseWaypoint(object):
-    def __init__(self, x=0.0, y=0.0, z=0.0, frame=None, time=None):
+    def __init__(self, x=0.0, y=0.0, z=0.0, frame="map", time=None):
         self.x = x
         self.y = y
         self.z = z
         self.frame = frame
-        self.time = time
+        self.time = time if time is not None else rospy.Time.now()
 
     def euclidean_distance(self, target):
         return sqrt(pow(target.x - self.x, 2) + pow(target.y - self.y, 2) + pow(target.z - self.z, 2))
@@ -130,9 +130,9 @@ class WaypointServer(object):
             x = self.origin_pos.x + (distance_to_wp * cos(bearing_to_wp))
             y = -(self.origin_pos.y + (distance_to_wp * sin(bearing_to_wp)))
             z = g.alt - self.origin_pos.z
-            return PoseWaypoint(x, y, z)
+            return PoseWaypoint(x, y, z, "odom")
 
-    def pose_publisher(self, pose):
+    def transform_pose(self, pose, target_frame):
         desired_pose = PoseStamped()
         desired_pose.header.frame_id = pose.frame
         desired_pose.header.stamp = pose.time
@@ -144,10 +144,13 @@ class WaypointServer(object):
         desired_pose.pose.orientation.z = 0
         desired_pose.pose.orientation.w = 1
 
-        transform = self.tf_buffer.lookup_transform(self.target_frame, pose.frame, pose.time,
+        transform = self.tf_buffer.lookup_transform(target_frame, pose.frame, pose.time,
                                                     rospy.Duration(1))
         transformed_pose = tf2_geometry_msgs.do_transform_pose(desired_pose, transform)
+        return transformed_pose
 
+    def pose_publisher(self, pose):
+        transformed_pose = self.transform_pose(pose, self.target_frame)
         self.nav_goal_pub.publish(transformed_pose)
         self.marker_publisher(transformed_pose)
 
@@ -155,6 +158,8 @@ class WaypointServer(object):
             "GPS Fix is Valid! Setting Navigation Goal to: (X: %f, Y: %f, Z: %f)",
             transformed_pose.pose.position.x, transformed_pose.pose.position.y,
             transformed_pose.pose.position.z)
+        rospy.loginfo(
+            "Target waypoints in list: %d", len(self.target_wp_list))
 
     def marker_publisher(self, desired_pose):
         wp_marker = Marker()
@@ -212,6 +217,8 @@ class WaypointServer(object):
         frame = pose_waypoint.waypoint.header.frame_id
         time = pose_waypoint.waypoint.header.stamp
         pose_wp = PoseWaypoint(x, y, frame=frame, time=time)
+        pose_wp = self.transform_pose(pose_wp, "odom")
+        pose_wp = PoseWaypoint(pose_wp.pose.position.x, pose_wp.pose.position.y, pose_wp.pose.position.z, frame="odom", time=time)
 
         rospy.loginfo("Recieved Pose Waypoint (X: %f, Y: %f)", x, y)
 

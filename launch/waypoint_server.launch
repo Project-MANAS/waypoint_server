@@ -4,5 +4,6 @@
     <param name="gps_topic" value="/gps"/>
     <param name="odom_topic" value="/odom"/>
     <param name="publish_displacement_from_wp" value="True"/>
+    <param name="generate_waypoints_from_file" value="False"/>
   </node>
 </launch>
