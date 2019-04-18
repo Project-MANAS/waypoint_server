@@ -11,12 +11,13 @@ import rospy
 import json
 import os
 from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import Imu
 from geometry_msgs.msg import PoseStamped
 from waypoint_server.srv import *
 import tf2_ros
 import tf2_geometry_msgs
 from geopy import distance
-
+from tf.transformations import euler_from_quaternion
 
 class GeoWaypoint(object):
     def __init__(self, lat=0.0, lon=0.0, alt=0.0):
@@ -45,6 +46,7 @@ class PoseWaypoint(object):
         self.y = y
         self.z = z
         self.frame = frame
+        self.orientation = None
         self.time = time if time is not None else rospy.Time.now()
 
     def euclidean_distance(self, target):
@@ -56,6 +58,7 @@ class WaypointServer(object):
         self.origin_geo = None
         self.current_pos = None
         self.origin_pos = None
+        self.initial_orientation = None
 
         self.target_wp = None
         self.target_wp_list = []
@@ -70,6 +73,7 @@ class WaypointServer(object):
 
         self.gps_topic = rospy.get_param("/waypoint_server/gps_topic", "gps")
         self.odom_topic = rospy.get_param("/waypoint_server/odom_topic", "odom")
+        self.imu_topic =  rospy.get_param("waypoint_server/imu_topic","imu")
 
         self.nav_goal_pub = rospy.Publisher('move_base_simple/goal', PoseStamped, queue_size=10)
         self.marker_pub = rospy.Publisher('waypoint_marker', Marker, queue_size=10)
@@ -96,9 +100,10 @@ class WaypointServer(object):
         rate = rospy.Rate(0.5)
         rospy.Subscriber(self.gps_topic, NavSatFix, self.gps_subscriber)
         rospy.Subscriber(self.odom_topic, Odometry, self.robot_pose_subscriber)
+        rospy.Subscriber(self.imu_topic, Imu, self.robot_orientation_subscriber)
         rospy.Service('set_pose_waypoint', SetPoseWaypoint, self.set_pose_waypoint)
         rospy.Service('set_geo_waypoint', SetGeoWaypoint, self.set_geo_waypoint)
-        rospy.Service('get_current_waypoint', QueryTargetWaypoint, self.get_target_waypoint)
+        rospy.Service('get_target_waypoint', QueryTargetWaypoint, self.get_target_waypoint)
         while not rospy.is_shutdown():
             rate.sleep()
             if self.gps_fix and self.generate_wp_from_file:
@@ -125,8 +130,9 @@ class WaypointServer(object):
         if self.gps_fix:
             bearing_to_wp = self.origin_geo.bearing(g)
             distance_to_wp = self.origin_geo.haversine_distance(g)
-            x = self.origin_pos.x + (distance_to_wp * cos(bearing_to_wp))
-            y = self.origin_pos.y - (distance_to_wp * sin(bearing_to_wp))
+            (roll, pitch, yaw) = euler_from_quaternion(self.initial_orientation)
+            x = self.origin_pos.x + (distance_to_wp * cos(bearing_to_wp + yaw))
+            y = self.origin_pos.y - (distance_to_wp * sin(bearing_to_wp + yaw))
             z = -g.alt - self.origin_pos.z
             rospy.loginfo(str(self.origin_pos.x)+" "+str(self.origin_pos.y)+" "+str((distance_to_wp * cos(bearing_to_wp)))+" "+str((distance_to_wp * sin(bearing_to_wp))))
             return PoseWaypoint(x, y, z, "odom")
@@ -193,6 +199,14 @@ class WaypointServer(object):
                 "GPS Fix Available. Origin set to Latitude: %f, Longitude: %f",
                 self.origin_geo.lat, self.origin_geo.lon)
 
+    def robot_orientation_subscriber(self, orientation_msg):
+        self.initial_orientation = [
+                                    orientation_msg.orientation.x,
+                                    orientation_msg.orientation.y,
+                                    orientation_msg.orientation.z,
+                                    orientation_msg.orientation.w
+                                    ]
+
     def robot_pose_subscriber(self, pose_msg):
         x = pose_msg.pose.pose.position.x
         y = pose_msg.pose.pose.position.y
@@ -202,6 +216,7 @@ class WaypointServer(object):
 
         if not self.gps_fix:
             self.origin_pos = PoseWaypoint(x, y, z, frame, time)
+            self.origin_pos.orientation = pose_msg.pose.pose.orientation
 
         self.current_pos = PoseWaypoint(x, y, z, frame, time)
 
