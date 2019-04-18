@@ -17,8 +17,6 @@ import tf2_ros
 import tf2_geometry_msgs
 from geopy import distance
 
-EARTHRADIUS = 6371000.0
-
 
 class GeoWaypoint(object):
     def __init__(self, lat=0.0, lon=0.0, alt=0.0):
@@ -121,15 +119,16 @@ class WaypointServer(object):
             self.pose_publisher(self.target_wp)
 
         else:
-            rospy.loginfo("No waypoint availabel!")
+            rospy.loginfo("No waypoint available!")
 
     def geo_to_pose(self, g):
         if self.gps_fix:
             bearing_to_wp = self.origin_geo.bearing(g)
             distance_to_wp = self.origin_geo.haversine_distance(g)
             x = self.origin_pos.x + (distance_to_wp * cos(bearing_to_wp))
-            y = -(self.origin_pos.y + (distance_to_wp * sin(bearing_to_wp)))
-            z = g.alt - self.origin_pos.z
+            y = self.origin_pos.y - (distance_to_wp * sin(bearing_to_wp))
+            z = -g.alt - self.origin_pos.z
+            rospy.loginfo(str(self.origin_pos.x)+" "+str(self.origin_pos.y)+" "+str((distance_to_wp * cos(bearing_to_wp)))+" "+str((distance_to_wp * sin(bearing_to_wp))))
             return PoseWaypoint(x, y, z, "odom")
 
     def transform_pose(self, pose, target_frame):
