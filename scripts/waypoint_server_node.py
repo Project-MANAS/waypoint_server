@@ -14,6 +14,7 @@ from sensor_msgs.msg import NavSatFix
 from sensor_msgs.msg import Imu
 from geometry_msgs.msg import PoseStamped
 from waypoint_server.srv import *
+from std_srvs.srv import *
 import tf2_ros
 import tf2_geometry_msgs
 from geopy import distance
@@ -104,6 +105,7 @@ class WaypointServer(object):
         rospy.Service('set_pose_waypoint', SetPoseWaypoint, self.set_pose_waypoint)
         rospy.Service('set_geo_waypoint', SetGeoWaypoint, self.set_geo_waypoint)
         rospy.Service('get_target_waypoint', QueryTargetWaypoint, self.get_target_waypoint)
+        rospy.Service('set_last_waypoint',Trigger,self.set_last_waypoint)
         while not rospy.is_shutdown():
             rate.sleep()
             if self.gps_fix and self.generate_wp_from_file:
@@ -299,6 +301,12 @@ class WaypointServer(object):
             res.status = 0
         return res
 
+    def set_last_waypoint(self,data):
+        res = TriggerResponse()
+        self.pose_publisher(self.target_wp)
+        res.success = True
+        res.message = "Last waypoint set successfully!"
+        return res
 
 if __name__ == "__main__":
     rospy.init_node("waypoint_server", anonymous=True)
