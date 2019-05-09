@@ -20,6 +20,7 @@ import tf2_geometry_msgs
 from geopy import distance
 from tf.transformations import euler_from_quaternion
 
+
 class GeoWaypoint(object):
     def __init__(self, lat=0.0, lon=0.0, alt=0.0):
         self.lat = lat
@@ -74,7 +75,7 @@ class WaypointServer(object):
 
         self.gps_topic = rospy.get_param("/waypoint_server/gps_topic", "gps")
         self.odom_topic = rospy.get_param("/waypoint_server/odom_topic", "odom")
-        self.imu_topic =  rospy.get_param("waypoint_server/imu_topic","imu")
+        self.imu_topic = rospy.get_param("waypoint_server/imu_topic", "imu")
 
         self.nav_goal_pub = rospy.Publisher('move_base_simple/goal', PoseStamped, queue_size=10)
         self.marker_pub = rospy.Publisher('waypoint_marker', Marker, queue_size=10)
@@ -105,7 +106,7 @@ class WaypointServer(object):
         rospy.Service('set_pose_waypoint', SetPoseWaypoint, self.set_pose_waypoint)
         rospy.Service('set_geo_waypoint', SetGeoWaypoint, self.set_geo_waypoint)
         rospy.Service('get_target_waypoint', QueryTargetWaypoint, self.get_target_waypoint)
-        rospy.Service('set_last_waypoint',Trigger,self.set_last_waypoint)
+        rospy.Service('set_last_waypoint', Trigger, self.set_last_waypoint)
         while not rospy.is_shutdown():
             rate.sleep()
             if self.gps_fix and self.generate_wp_from_file:
@@ -136,7 +137,8 @@ class WaypointServer(object):
             x = self.origin_pos.x + (distance_to_wp * cos(bearing_to_wp + yaw))
             y = self.origin_pos.y - (distance_to_wp * sin(bearing_to_wp + yaw))
             z = -g.alt - self.origin_pos.z
-            rospy.loginfo(str(self.origin_pos.x)+" "+str(self.origin_pos.y)+" "+str((distance_to_wp * cos(bearing_to_wp)))+" "+str((distance_to_wp * sin(bearing_to_wp))))
+            rospy.loginfo(str(self.origin_pos.x) + " " + str(self.origin_pos.y) + " " + str(
+                (distance_to_wp * cos(bearing_to_wp))) + " " + str((distance_to_wp * sin(bearing_to_wp))))
             return PoseWaypoint(x, y, z, "odom")
 
     def transform_pose(self, pose, target_frame):
@@ -151,8 +153,13 @@ class WaypointServer(object):
         desired_pose.pose.orientation.z = 0
         desired_pose.pose.orientation.w = 1
 
-        transform = self.tf_buffer.lookup_transform(target_frame, pose.frame, pose.time,
-                                                    rospy.Duration(1))
+        try:
+            transform = self.tf_buffer.lookup_transform(target_frame, pose.frame, pose.time,
+                                                        rospy.Duration(1))
+        except Exception as e:
+            transform = self.tf_buffer.lookup_transform(target_frame, pose.frame, rospy.Time(0),
+                                                        rospy.Duration(1))
+
         transformed_pose = tf2_geometry_msgs.do_transform_pose(desired_pose, transform)
         return transformed_pose
 
@@ -194,7 +201,6 @@ class WaypointServer(object):
 
     def gps_subscriber(self, gps_msg):
         if gps_msg.status.status > -1 and not self.gps_fix and self.origin_pos is not None:
-            # TODO: check if origin_pos requires transform to take into account the time difference
             self.origin_geo = GeoWaypoint(gps_msg.latitude, gps_msg.longitude)
             self.gps_fix = True
             rospy.loginfo(
@@ -203,11 +209,11 @@ class WaypointServer(object):
 
     def robot_orientation_subscriber(self, orientation_msg):
         self.initial_orientation = [
-                                    orientation_msg.orientation.x,
-                                    orientation_msg.orientation.y,
-                                    orientation_msg.orientation.z,
-                                    orientation_msg.orientation.w
-                                    ]
+            orientation_msg.orientation.x,
+            orientation_msg.orientation.y,
+            orientation_msg.orientation.z,
+            orientation_msg.orientation.w
+        ]
 
     def robot_pose_subscriber(self, pose_msg):
         x = pose_msg.pose.pose.position.x
@@ -234,7 +240,8 @@ class WaypointServer(object):
         time = pose_waypoint.waypoint.header.stamp
         pose_wp = PoseWaypoint(x, y, frame=frame, time=time)
         pose_wp = self.transform_pose(pose_wp, "odom")
-        pose_wp = PoseWaypoint(pose_wp.pose.position.x, pose_wp.pose.position.y, pose_wp.pose.position.z, frame="odom", time=time)
+        pose_wp = PoseWaypoint(pose_wp.pose.position.x, pose_wp.pose.position.y, pose_wp.pose.position.z, frame="odom",
+                               time=time)
 
         rospy.loginfo("Recieved Pose Waypoint (X: %f, Y: %f)", x, y)
 
@@ -301,12 +308,13 @@ class WaypointServer(object):
             res.status = 0
         return res
 
-    def set_last_waypoint(self,data):
+    def set_last_waypoint(self, data):
         res = TriggerResponse()
         self.pose_publisher(self.target_wp)
         res.success = True
         res.message = "Last waypoint set successfully!"
         return res
+
 
 if __name__ == "__main__":
     rospy.init_node("waypoint_server", anonymous=True)
