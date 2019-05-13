@@ -89,6 +89,61 @@ function initMap()
   var locations;
   var marker, i;
 
+  var botCenter = new google.maps.LatLng(0.00,0.00)
+
+  var botArea = new google.maps.Circle({
+        strokeColor: '#004ac1',
+        strokeOpacity: 0.2,
+        strokeWeight: 2,
+        fillColor: '#77abff',
+        fillOpacity: 0.35,
+        map: map,
+        center: botCenter,
+        radius: 30
+      });
+
+  var botMarker = new google.maps.Marker({
+        position: botCenter,
+        icon: {
+            strokeColor: '#FFFFFF',
+            fillColor: '#004ac1',
+            fillOpacity: 1,
+            strokeWeight: 1.5,
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 8
+          },
+        map: map
+      });
+
+  var ros = new ROSLIB.Ros({
+    url : 'ws://localhost:9090'
+  });
+
+  ros.on('connection', function() {
+    console.log('Connected to websocket server.');
+  });
+
+  ros.on('error', function(error) {
+    console.log('Error connecting to websocket server: ', error);
+  });
+
+  ros.on('close', function() {
+    console.log('Connection to websocket server closed.');
+  });
+
+  var listener = new ROSLIB.Topic({
+    ros : ros,
+    name : '/vectornav/GPS',
+    messageType : 'sensor_msgs/NavSatFix'
+  });
+
+  listener.subscribe(function(message) {
+    console.log('GPS Fix received ' + listener.name + ': ' + message.latitude + ", " + message.longitude);
+    var newLatLng = new google.maps.LatLng(message.latitude, message.longitude);
+    botMarker.setPosition(newLatLng);
+    botArea.setCenter(newLatLng);
+  });
+
   $.getJSON("coordinates.json", function(json) {
     locations = json;
 

@@ -1,4 +1,7 @@
+<?xml version="1.0"?>
 <launch>
+  <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch"/>
+
   <node type="waypoint_server_node.py" name="waypoint_server" pkg="waypoint_server" output="screen">
     <param name="gps_topic" value="/gps"/>
     <param name="odom_topic" value="/odom"/>
