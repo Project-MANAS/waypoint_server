@@ -20,6 +20,7 @@ import tf2_ros
 import tf2_geometry_msgs
 from geopy import distance
 from tf.transformations import euler_from_quaternion
+import utm
 
 
 class GeoWaypoint(object):
@@ -76,7 +77,7 @@ class WaypointServer(object):
         self.gps_topic = rospy.get_param("/waypoint_server/gps_topic", "gps")
         self.odom_topic = rospy.get_param("/waypoint_server/odom_topic", "odom")
         self.imu_topic = rospy.get_param("waypoint_server/imu_topic", "imu")
-        self.goal_reached_topic = rospy.get_param("waypoint_server/goal_reached", "goal_reached")
+        self.threshold_distance = rospy.get_param("waypoint_server/threshold_distance", 5)
 
         self.nav_goal_pub = rospy.Publisher('move_base_simple/goal', PoseStamped, queue_size=10)
         self.marker_pub = rospy.Publisher('waypoint_marker', Marker, queue_size=10)
@@ -103,7 +104,6 @@ class WaypointServer(object):
         rospy.Subscriber(self.gps_topic, NavSatFix, self.gps_subscriber)
         rospy.Subscriber(self.odom_topic, Odometry, self.robot_pose_subscriber)
         rospy.Subscriber(self.imu_topic, Imu, self.robot_orientation_subscriber)
-        rospy.Subscriber(self.goal_reached_topic, Bool, self.goal_reached_subscriber)
         rospy.Service('set_pose_waypoint', SetPoseWaypoint, self.set_pose_waypoint)
         rospy.Service('set_geo_waypoint', SetGeoWaypoint, self.set_geo_waypoint)
         rospy.Service('get_target_waypoint', QueryTargetWaypoint, self.get_target_waypoint)
@@ -112,7 +112,10 @@ class WaypointServer(object):
 
     def waypoint_publisher(self):
         if self.target_wp is not None:
-            return
+            distance_to_wp = self.current_pos.euclidean_distance(self.target_wp)
+            if distance_to_wp <= self.threshold_distance:
+                self.target_wp = None
+                self.waypoint_publisher()
 
         elif self.target_wp_list:
             self.target_wp = self.target_wp_list.pop(0)
@@ -192,11 +195,6 @@ class WaypointServer(object):
 
         self.marker_pub.publish(wp_marker)
 
-    def goal_reached_subscriber(self, msg):
-    	if msg.data:
-    		self.target_wp = None
-    		self.waypoint_publisher()
-
     def gps_subscriber(self, gps_msg):
         if gps_msg.status.status > -1 and not self.gps_fix and self.origin_pos is not None:
             self.origin_geo = GeoWaypoint(gps_msg.latitude, gps_msg.longitude)
@@ -205,7 +203,7 @@ class WaypointServer(object):
                 "GPS Fix Available. Origin set to Latitude: %f, Longitude: %f",
                 self.origin_geo.lat, self.origin_geo.lon)
             if self.generate_wp_from_file:
-            	self.read_waypoints_from_file(self.generate_wp_from_file)
+                self.read_waypoints_from_file(self.generate_wp_from_file)
 
     def robot_orientation_subscriber(self, orientation_msg):
         self.initial_orientation = [

@@ -6,8 +6,8 @@
     <param name="gps_topic" value="/gps"/>
     <param name="odom_topic" value="/odom"/>
     <param name="imu_topic" value="/imu"/>
-    <param name="goal_reached_topic" value="/goal_reached"/>
+    <param name="threshold_distance" value="5"/>
     <param name="publish_displacement_from_wp" value="True"/>
-    <param name="generate_waypoints_from_file" value="False"/>
+    <param name="generate_waypoints_from_file" value="intermediate_coordinates.json"/>
   </node>
 </launch>
