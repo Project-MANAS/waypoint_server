@@ -3,11 +3,11 @@
   <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch"/>
 
   <node type="waypoint_server_node.py" name="waypoint_server" pkg="waypoint_server" output="screen">
-    <param name="gps_topic" value="/gps"/>
+    <param name="gps_topic" value="/vectornav/INS"/>
     <param name="odom_topic" value="/odom"/>
-    <param name="imu_topic" value="/imu"/>
+    <param name="imu_topic" value="/vectornav/IMU"/>
     <param name="threshold_distance" value="5"/>
     <param name="publish_displacement_from_wp" value="True"/>
-    <param name="generate_waypoints_from_file" value="intermediate_coordinates.json"/>
+    <param name="generate_waypoints_from_file" value="False"/>
   </node>
 </launch>

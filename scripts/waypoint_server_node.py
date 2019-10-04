@@ -109,7 +109,7 @@ class WaypointServer(object):
         self.wp_num = 0
         self.gps_fix = False
 
-        self.target_frame = rospy.get_param("/waypoint_server/target_frame", "map")
+        self.target_frame = rospy.get_param("/waypoint_server/target_frame", "odom")
 
         self.publish_disp_from_wp = rospy.get_param("/waypoint_server/publish_displacement_from_wp", False)
         self.generate_wp_from_file = rospy.get_param("/waypoint_server/generate_waypoints_from_file", False)
