@@ -69,7 +69,7 @@ class WaypointServer(object):
         self.wp_num = 0
         self.gps_fix = False
 
-        self.target_frame = rospy.get_param("/waypoint_server/target_frame", "map")
+        self.target_frame = rospy.get_param("/waypoint_server/target_frame", "odom")
 
         self.publish_disp_from_wp = rospy.get_param("/waypoint_server/publish_displacement_from_wp", False)
         self.generate_wp_from_file = rospy.get_param("/waypoint_server/generate_waypoints_from_file", False)
@@ -96,11 +96,14 @@ class WaypointServer(object):
                 coordinates = json.load(f)
             self.target_wp_list = [self.geo_to_pose(GeoWaypoint(coordinate[0], coordinate[1])) for coordinate in
                                    coordinates]
+            self.generate_wp_from_file = False
+            self.waypoint_publisher()
         else:
             rospy.loginfo("File [{}] does not exist!".format(file))
 
     def run_server(self):
         rospy.loginfo("Waypoint Server is ready!")
+        rate = rospy.Rate(0.5)
         rospy.Subscriber(self.gps_topic, NavSatFix, self.gps_subscriber)
         rospy.Subscriber(self.odom_topic, Odometry, self.robot_pose_subscriber)
         rospy.Subscriber(self.imu_topic, Imu, self.robot_orientation_subscriber)
@@ -108,7 +111,9 @@ class WaypointServer(object):
         rospy.Service('set_geo_waypoint', SetGeoWaypoint, self.set_geo_waypoint)
         rospy.Service('get_target_waypoint', QueryTargetWaypoint, self.get_target_waypoint)
         rospy.Service('set_last_waypoint', Trigger, self.set_last_waypoint)
-        rospy.spin()
+        while not rospy.is_shutdown():
+            rate.sleep()
+            self.waypoint_publisher()
 
     def waypoint_publisher(self):
         if self.target_wp is not None:
