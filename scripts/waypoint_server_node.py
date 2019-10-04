@@ -19,8 +19,49 @@ from std_srvs.srv import *
 import tf2_ros
 import tf2_geometry_msgs
 from geopy import distance
-from tf.transformations import euler_from_quaternion
+import tf.transformations as transforms
 import utm
+import numpy as np
+
+class Transform(object):
+    def __init__(self):
+        self.q = [0, 0, 0, 1]
+
+    def set_position(self, lat=0.0, lon=0.0, alt=0.0):
+        self.lat = lat
+        self.lon = lon
+        self.alt = alt
+        y, x, _, _ = utm.from_latlon(lat, lon)
+        self.m_origin = [x, y, 0]
+
+    def set_basis(self, q):
+        self.m_basis = transforms.quaternion_matrix(q)[0:3, 0:3]
+
+    def set_origin(self, v):
+        self.m_origin = v
+
+    def get_inverse(self):
+        inverse = Transform()
+        inverse.m_basis = self.m_basis.transpose()
+        inverse.m_origin = self.mul_basis_origin(inverse.m_basis, [-x for x in self.m_origin])
+        return inverse
+
+    @staticmethod
+    def mul_basis_origin(m_basis, m_origin):
+        x = m_basis[0].dot(m_origin)
+        y = m_basis[1].dot(m_origin)
+        z = m_basis[2].dot(m_origin)
+        return [x, y, z]
+
+    @staticmethod
+    def mult(t1, t2):
+        target_transform = Transform()
+        target_transform.m_basis = transforms.quaternion_matrix(t1.q).dot(transforms.quaternion_matrix(t2.q))
+        target_transform.m_origin = [0, 0, 0]
+        target_transform.m_origin[0] = np.dot(t1.m_basis[0], t2.m_origin) + t1.m_origin[0]
+        target_transform.m_origin[1] = np.dot(t1.m_basis[1], t2.m_origin) + t1.m_origin[1]
+        target_transform.m_origin[2] = np.dot(t1.m_basis[2], t2.m_origin) + t1.m_origin[2]
+        return target_transform
 
 
 class GeoWaypoint(object):
@@ -59,10 +100,9 @@ class PoseWaypoint(object):
 
 class WaypointServer(object):
     def __init__(self):
-        self.origin_geo = None
+        self.origin_transform = Transform()
         self.current_pos = None
         self.origin_pos = None
-        self.initial_orientation = None
 
         self.target_wp = None
         self.target_wp_list = []
@@ -96,19 +136,24 @@ class WaypointServer(object):
                 coordinates = json.load(f)
             self.target_wp_list = [self.geo_to_pose(GeoWaypoint(coordinate[0], coordinate[1])) for coordinate in
                                    coordinates]
+            self.generate_wp_from_file = False
+            self.waypoint_publisher()
         else:
             rospy.loginfo("File [{}] does not exist!".format(file))
 
     def run_server(self):
         rospy.loginfo("Waypoint Server is ready!")
+        rate = rospy.Rate(0.5)
         rospy.Subscriber(self.gps_topic, NavSatFix, self.gps_subscriber)
         rospy.Subscriber(self.odom_topic, Odometry, self.robot_pose_subscriber)
-        rospy.Subscriber(self.imu_topic, Imu, self.robot_orientation_subscriber)
+        self.robot_orientation_sub = rospy.Subscriber(self.imu_topic, Imu, self.robot_orientation_subscriber)
         rospy.Service('set_pose_waypoint', SetPoseWaypoint, self.set_pose_waypoint)
         rospy.Service('set_geo_waypoint', SetGeoWaypoint, self.set_geo_waypoint)
         rospy.Service('get_target_waypoint', QueryTargetWaypoint, self.get_target_waypoint)
         rospy.Service('set_last_waypoint', Trigger, self.set_last_waypoint)
-        rospy.spin()
+        while not rospy.is_shutdown():
+            rate.sleep()
+            self.waypoint_publisher()
 
     def waypoint_publisher(self):
         if self.target_wp is not None:
@@ -127,15 +172,12 @@ class WaypointServer(object):
 
     def geo_to_pose(self, g):
         if self.gps_fix:
-            bearing_to_wp = self.origin_geo.bearing(g)
-            distance_to_wp = self.origin_geo.haversine_distance(g)
-            (roll, pitch, yaw) = euler_from_quaternion(self.initial_orientation)
-            x = self.origin_pos.x + (distance_to_wp * cos(bearing_to_wp + yaw))
-            y = self.origin_pos.y - (distance_to_wp * sin(bearing_to_wp + yaw))
-            z = -g.alt - self.origin_pos.z
-            rospy.loginfo(str(self.origin_pos.x) + " " + str(self.origin_pos.y) + " " + str(
-                (distance_to_wp * cos(bearing_to_wp))) + " " + str((distance_to_wp * sin(bearing_to_wp))))
-            return PoseWaypoint(x, y, z, "odom")
+            goal_transform = Transform()
+            goal_transform.set_position(g.lat, g.lon)
+            pose_transform = Transform.mult(self.origin_transform.get_inverse(), goal_transform)
+            x = pose_transform.m_origin[0]
+            y = -pose_transform.m_origin[1]
+            return PoseWaypoint(x, y, 0, "odom")
 
     def transform_pose(self, pose, target_frame):
         desired_pose = PoseStamped()
@@ -197,21 +239,23 @@ class WaypointServer(object):
 
     def gps_subscriber(self, gps_msg):
         if gps_msg.status.status > -1 and not self.gps_fix and self.origin_pos is not None:
-            self.origin_geo = GeoWaypoint(gps_msg.latitude, gps_msg.longitude)
+            self.origin_transform.set_position(gps_msg.latitude, gps_msg.longitude)
             self.gps_fix = True
             rospy.loginfo(
                 "GPS Fix Available. Origin set to Latitude: %f, Longitude: %f",
-                self.origin_geo.lat, self.origin_geo.lon)
+                self.origin_transform.lat, self.origin_transform.lon)
             if self.generate_wp_from_file:
                 self.read_waypoints_from_file(self.generate_wp_from_file)
 
     def robot_orientation_subscriber(self, orientation_msg):
-        self.initial_orientation = [
+        initial_orientation = [
             orientation_msg.orientation.x,
             orientation_msg.orientation.y,
             orientation_msg.orientation.z,
             orientation_msg.orientation.w
         ]
+        self.origin_transform.set_basis(initial_orientation)
+        self.robot_orientation_sub.unregister()
 
     def robot_pose_subscriber(self, pose_msg):
         x = pose_msg.pose.pose.position.x
